@@ -1,69 +1,182 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+
+const navItems = [
+  "Dashboard",
+  "AI Agents",
+  "Knowledge",
+  "Conversations",
+  "Leads",
+  "Analytics",
+];
 
 export default function Home() {
+  const [active, setActive] = useState("Dashboard");
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="flex min-h-screen">
+        <aside className="hidden w-64 border-r border-slate-200 bg-white md:flex md:flex-col">
+          <div className="border-b border-slate-200 px-6 py-6">
+            <div className="text-xl font-bold">Customer AI</div>
+            <p className="mt-1 text-xs text-slate-500">
+              AI customer service platform
+            </p>
+          </div>
+
+          <nav className="flex-1 px-3 py-5">
+            {navItems.map((item) => (
+              <button
+                key={item}
+                onClick={() => setActive(item)}
+                className={`mb-1 w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium ${
+                  active === item
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </nav>
+
+          <div className="border-t border-slate-200 p-4">
+            <button className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium">
+              Settings
+            </button>
+          </div>
+        </aside>
+
+        <section className="flex-1">
+          <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4 md:px-8">
+            <div>
+              <h1 className="text-lg font-semibold">{active}</h1>
+              <p className="text-xs text-slate-500">
+                Manage your AI customer service
+              </p>
+            </div>
+
+            <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+              Create AI Agent
+            </button>
+          </header>
+
+          <div className="p-5 md:p-8">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold">
+                Welcome to Customer AI
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                Build an AI customer-service agent that understands your
+                business, answers customer questions, and helps your team
+                capture leads.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric title="Conversations" value="0" />
+              <Metric title="AI Resolved" value="0" />
+              <Metric title="Human Handoffs" value="0" />
+              <Metric title="Leads Captured" value="0" />
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-white p-6 lg:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Your AI Agent</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Create an agent and give it knowledge about your
+                      business.
+                    </p>
+                  </div>
+
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">
+                    Not configured
+                  </span>
+                </div>
+
+                <div className="mt-6 rounded-lg border border-dashed border-slate-300 p-8 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-sm font-bold">
+                    AI
+                  </div>
+
+                  <h4 className="mt-4 font-semibold">
+                    Create your first AI agent
+                  </h4>
+
+                  <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+                    Add business information, products, FAQs, documents, and
+                    website content so your agent can answer customers.
+                  </p>
+
+                  <button className="mt-5 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white">
+                    Create AI Agent
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-6">
+                <h3 className="font-semibold">Knowledge Base</h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Information your AI can use when answering customers.
+                </p>
+
+                <div className="mt-6 space-y-3">
+                  {[
+                    "PDF documents",
+                    "Business FAQs",
+                    "Products & services",
+                    "Website content",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center gap-3 rounded-lg bg-slate-50 p-3"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-xs shadow-sm">
+                        +
+                      </div>
+                      <span className="text-sm font-medium">{item}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button className="mt-6 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium">
+                  Add Knowledge
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
+              <h3 className="font-semibold">Recent conversations</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Customer conversations will appear here.
+              </p>
+
+              <div className="mt-6 rounded-lg bg-slate-50 p-8 text-center text-sm text-slate-500">
+                No conversations yet.
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function Metric({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <p className="text-sm text-slate-500">{title}</p>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>
   );
 }

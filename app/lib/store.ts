@@ -8,6 +8,7 @@ export type Agent = {
 
 export type KnowledgeItem = {
   id: string;
+  agentId: string;
   title: string;
   type: string;
   content: string;
@@ -25,6 +26,7 @@ export type Lead = {
 
 export type Conversation = {
   id: string;
+  agentId: string;
   message: string;
   reply: string;
   createdAt: string;

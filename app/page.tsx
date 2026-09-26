@@ -77,6 +77,22 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  async function handleLogout() {
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Logout failed");
+      }
+
+      window.location.href = "/login";
+    } catch {
+      setError("Unable to sign out. Please try again.");
+    }
+  }
+
   async function loadData() {
     try {
       setLoading(true);
@@ -285,8 +301,11 @@ export default function Home() {
           </nav>
 
           <div className="border-t border-slate-200 p-4">
-            <button className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium">
-              Settings
+            <button
+              onClick={handleLogout}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
+            >
+              Sign out
             </button>
           </div>
         </aside>

@@ -76,6 +76,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [businessName, setBusinessName] = useState("");
 
   async function handleLogout() {
     try {
@@ -98,17 +99,26 @@ export default function Home() {
       setLoading(true);
       setError("");
 
-      const [agentsResponse, statsResponse] = await Promise.all([
-        fetch("/api/agents"),
-        fetch("/api/stats"),
-      ]);
+      const [businessResponse, agentsResponse, statsResponse] =
+        await Promise.all([
+          fetch("/api/business"),
+          fetch("/api/agents"),
+          fetch("/api/stats"),
+        ]);
 
-      if (!agentsResponse.ok || !statsResponse.ok) {
+      if (
+        !businessResponse.ok ||
+        !agentsResponse.ok ||
+        !statsResponse.ok
+      ) {
         throw new Error("Unable to load dashboard data.");
       }
 
+      const businessData = await businessResponse.json();
       const agentsData = await agentsResponse.json();
       const statsData = await statsResponse.json();
+
+      setBusinessName(businessData.business.name);
 
       setAgents(agentsData.agents);
       setStats(statsData);
@@ -315,7 +325,7 @@ export default function Home() {
             <div>
               <h1 className="text-lg font-semibold">{active}</h1>
               <p className="text-xs text-slate-500">
-                Manage your AI customer service
+                {businessName || "Your business"} · Manage your AI customer service
               </p>
             </div>
 

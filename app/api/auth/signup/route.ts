@@ -43,6 +43,17 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!data.session) {
+      return Response.json(
+        {
+          requiresEmailConfirmation: true,
+          message:
+            "Account created. Please check your email and confirm your address before signing in.",
+        },
+        { status: 201 },
+      );
+    }
+
     const { data: business, error: businessError } = await supabase
       .from("businesses")
       .insert({
@@ -77,6 +88,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         message: "Account created successfully",
+        requiresEmailConfirmation: false,
         user: {
           id: data.user.id,
           email: data.user.email,

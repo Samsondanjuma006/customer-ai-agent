@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
@@ -11,11 +12,13 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const response = await fetch("/api/auth/signup", {
@@ -37,7 +40,16 @@ export default function SignupPage() {
         return;
       }
 
+      if (data.requiresEmailConfirmation) {
+        setSuccess(
+          data.message ||
+            "Account created. Please check your email to confirm your address.",
+        );
+        return;
+      }
+
       router.push("/");
+      router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -90,6 +102,7 @@ export default function SignupPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@example.com"
                 required
+                autoComplete="email"
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-blue-500"
               />
             </div>
@@ -106,6 +119,7 @@ export default function SignupPage() {
                 placeholder="At least 8 characters"
                 minLength={8}
                 required
+                autoComplete="new-password"
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-blue-500"
               />
             </div>
@@ -113,6 +127,20 @@ export default function SignupPage() {
             {error && (
               <div className="rounded-xl border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="rounded-xl border border-green-900 bg-green-950/40 p-3 text-sm text-green-300">
+                {success}
+                <div className="mt-3">
+                  <Link
+                    href="/login"
+                    className="font-semibold text-green-300 underline"
+                  >
+                    Go to sign in
+                  </Link>
+                </div>
               </div>
             )}
 
@@ -125,7 +153,17 @@ export default function SignupPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-slate-500">
+          <p className="mt-6 text-center text-sm text-slate-400">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-semibold text-blue-400 hover:text-blue-300"
+            >
+              Sign in
+            </Link>
+          </p>
+
+          <p className="mt-4 text-center text-xs text-slate-500">
             By creating an account, you agree to use the service responsibly.
           </p>
         </section>

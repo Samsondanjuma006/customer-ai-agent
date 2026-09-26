@@ -1,86 +1,94 @@
-import { createClient } from "@/app/lib/supabase-server";
+import { getAuthenticatedUser } from "@/app/lib/auth";
 
-async function getUserBusiness(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) return null;
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("business_members")
-    .select("business_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (membershipError || !membership) return null;
-
-  return membership.business_id;
-}
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const agentId = searchParams.get("agentId");
-
-  if (!agentId) {
-    return Response.json(
-      { error: "Agent ID is required" },
-      { status: 400 },
-    );
-  }
-
-  const supabase = await createClient();
-  const businessId = await getUserBusiness(supabase);
-
-  if (!businessId) {
-    return Response.json(
-      { error: "Authentication required" },
-      { status: 401 },
-    );
-  }
-
-  const { data: agent, error: agentError } = await supabase
-    .from("agents")
-    .select("id")
-    .eq("id", agentId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  if (agentError) {
-    return Response.json({ error: agentError.message }, { status: 500 });
-  }
-
-  if (!agent) {
-    return Response.json(
-      { error: "Agent not found" },
-      { status: 404 },
-    );
-  }
-
-  const { data, error } = await supabase
-    .from("knowledge_items")
-    .select("*")
-    .eq("agent_id", agentId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
-  }
-
-  const knowledge = data.map((item) => ({
+function formatKnowledgeItem(item: {
+  id: string;
+  agent_id: string;
+  title: string;
+  type: string;
+  content: string;
+  created_at: string;
+}) {
+  return {
     id: item.id,
     agentId: item.agent_id,
     title: item.title,
     type: item.type,
     content: item.content,
     createdAt: item.created_at,
-  }));
+  };
+}
 
-  return Response.json({ knowledge });
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const agentId = searchParams.get("agentId");
+
+    if (!agentId) {
+      return Response.json(
+        { error: "Agent ID is required" },
+        { status: 400 },
+      );
+    }
+
+    const { user, business, supabase } = await getAuthenticatedUser();
+
+    if (!user) {
+      return Response.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
+      );
+    }
+
+    const { data: agent, error: agentError } = await supabase
+      .from("agents")
+      .select("id")
+      .eq("id", agentId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    if (agentError) {
+      return Response.json(
+        { error: agentError.message },
+        { status: 500 },
+      );
+    }
+
+    if (!agent) {
+      return Response.json(
+        { error: "Agent not found" },
+        { status: 404 },
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("knowledge_items")
+      .select("*")
+      .eq("agent_id", agentId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return Response.json(
+        { error: error.message },
+        { status: 500 },
+      );
+    }
+
+    return Response.json({
+      knowledge: data.map(formatKnowledgeItem),
+    });
+  } catch {
+    return Response.json(
+      { error: "Unable to load knowledge" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -106,13 +114,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const businessId = await getUserBusiness(supabase);
+    const { user, business, supabase } = await getAuthenticatedUser();
 
-    if (!businessId) {
+    if (!user) {
       return Response.json(
         { error: "Authentication required" },
         { status: 401 },
+      );
+    }
+
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
       );
     }
 
@@ -120,11 +134,14 @@ export async function POST(request: Request) {
       .from("agents")
       .select("id")
       .eq("id", agentId)
-      .eq("business_id", businessId)
+      .eq("business_id", business.id)
       .maybeSingle();
 
     if (agentError) {
-      return Response.json({ error: agentError.message }, { status: 500 });
+      return Response.json(
+        { error: agentError.message },
+        { status: 500 },
+      );
     }
 
     if (!agent) {
@@ -146,19 +163,16 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return Response.json(
+        { error: error.message },
+        { status: 500 },
+      );
     }
 
-    const item = {
-      id: data.id,
-      agentId: data.agent_id,
-      title: data.title,
-      type: data.type,
-      content: data.content,
-      createdAt: data.created_at,
-    };
-
-    return Response.json({ item }, { status: 201 });
+    return Response.json(
+      { item: formatKnowledgeItem(data) },
+      { status: 201 },
+    );
   } catch {
     return Response.json(
       { error: "Invalid request body" },
@@ -179,13 +193,19 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const businessId = await getUserBusiness(supabase);
+    const { user, business, supabase } = await getAuthenticatedUser();
 
-    if (!businessId) {
+    if (!user) {
       return Response.json(
         { error: "Authentication required" },
         { status: 401 },
+      );
+    }
+
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
       );
     }
 
@@ -196,7 +216,10 @@ export async function DELETE(request: Request) {
       .maybeSingle();
 
     if (itemError) {
-      return Response.json({ error: itemError.message }, { status: 500 });
+      return Response.json(
+        { error: itemError.message },
+        { status: 500 },
+      );
     }
 
     if (!item) {
@@ -210,11 +233,14 @@ export async function DELETE(request: Request) {
       .from("agents")
       .select("id")
       .eq("id", item.agent_id)
-      .eq("business_id", businessId)
+      .eq("business_id", business.id)
       .maybeSingle();
 
     if (agentError) {
-      return Response.json({ error: agentError.message }, { status: 500 });
+      return Response.json(
+        { error: agentError.message },
+        { status: 500 },
+      );
     }
 
     if (!agent) {
@@ -230,7 +256,10 @@ export async function DELETE(request: Request) {
       .eq("id", id);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return Response.json(
+        { error: error.message },
+        { status: 500 },
+      );
     }
 
     return Response.json({ success: true });

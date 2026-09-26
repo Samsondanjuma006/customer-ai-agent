@@ -1,57 +1,61 @@
-import { createClient } from "@/app/lib/supabase-server";
+import { getAuthenticatedUser } from "@/app/lib/auth";
 
-async function getUserBusiness(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) return null;
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("business_members")
-    .select("business_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (membershipError || !membership) return null;
-
-  return membership.business_id;
-}
-
-export async function GET() {
-  const supabase = await createClient();
-  const businessId = await getUserBusiness(supabase);
-
-  if (!businessId) {
-    return Response.json(
-      { error: "Authentication required" },
-      { status: 401 },
-    );
-  }
-
-  const { data, error } = await supabase
-    .from("agents")
-    .select("*")
-    .eq("business_id", businessId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
-  }
-
-  const agents = data.map((agent) => ({
+function formatAgent(agent: {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+}) {
+  return {
     id: agent.id,
     name: agent.name,
     description: agent.description || "",
     status: agent.status,
     createdAt: agent.created_at,
-  }));
+  };
+}
 
-  return Response.json({ agents });
+export async function GET() {
+  try {
+    const { user, business, supabase } = await getAuthenticatedUser();
+
+    if (!user) {
+      return Response.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("agents")
+      .select("*")
+      .eq("business_id", business.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return Response.json(
+        { error: error.message },
+        { status: 500 },
+      );
+    }
+
+    return Response.json({
+      agents: data.map(formatAgent),
+    });
+  } catch {
+    return Response.json(
+      { error: "Unable to load agents" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -68,20 +72,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const businessId = await getUserBusiness(supabase);
+    const { user, business, supabase } = await getAuthenticatedUser();
 
-    if (!businessId) {
+    if (!user) {
       return Response.json(
         { error: "Authentication required" },
         { status: 401 },
       );
     }
 
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
+      );
+    }
+
     const { data, error } = await supabase
       .from("agents")
       .insert({
-        business_id: businessId,
+        business_id: business.id,
         name,
         description,
         status: "active",
@@ -90,18 +100,16 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return Response.json(
+        { error: error.message },
+        { status: 500 },
+      );
     }
 
-    const agent = {
-      id: data.id,
-      name: data.name,
-      description: data.description || "",
-      status: data.status,
-      createdAt: data.created_at,
-    };
-
-    return Response.json({ agent }, { status: 201 });
+    return Response.json(
+      { agent: formatAgent(data) },
+      { status: 201 },
+    );
   } catch {
     return Response.json(
       { error: "Invalid request body" },
@@ -124,13 +132,19 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const businessId = await getUserBusiness(supabase);
+    const { user, business, supabase } = await getAuthenticatedUser();
 
-    if (!businessId) {
+    if (!user) {
       return Response.json(
         { error: "Authentication required" },
         { status: 401 },
+      );
+    }
+
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
       );
     }
 
@@ -138,7 +152,7 @@ export async function PATCH(request: Request) {
       .from("agents")
       .update({ status })
       .eq("id", id)
-      .eq("business_id", businessId)
+      .eq("business_id", business.id)
       .select()
       .single();
 
@@ -149,15 +163,9 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const agent = {
-      id: data.id,
-      name: data.name,
-      description: data.description || "",
-      status: data.status,
-      createdAt: data.created_at,
-    };
-
-    return Response.json({ agent });
+    return Response.json({
+      agent: formatAgent(data),
+    });
   } catch {
     return Response.json(
       { error: "Invalid request body" },

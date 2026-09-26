@@ -1,54 +1,43 @@
-import { createClient } from "@/app/lib/supabase-server";
-
-async function getUserBusiness(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return null;
-  }
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("business_members")
-    .select("business_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (membershipError || !membership) {
-    return null;
-  }
-
-  return membership.business_id;
-}
+import { getAuthenticatedUser } from "@/app/lib/auth";
 
 export async function GET() {
-  const supabase = await createClient();
-  const businessId = await getUserBusiness(supabase);
+  try {
+    const { user, business, supabase } = await getAuthenticatedUser();
 
-  if (!businessId) {
+    if (!user) {
+      return Response.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("leads")
+      .select("*")
+      .eq("business_id", business.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return Response.json(
+        { error: error.message },
+        { status: 500 },
+      );
+    }
+
+    return Response.json({ leads: data });
+  } catch {
     return Response.json(
-      { error: "Authentication required" },
-      { status: 401 },
-    );
-  }
-
-  const { data, error } = await supabase
-    .from("leads")
-    .select("*")
-    .eq("business_id", businessId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return Response.json(
-      { error: error.message },
+      { error: "Unable to load leads" },
       { status: 500 },
     );
   }
-
-  return Response.json({ leads: data });
 }
 
 export async function POST(request: Request) {
@@ -66,20 +55,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const businessId = await getUserBusiness(supabase);
+    const { user, business, supabase } = await getAuthenticatedUser();
 
-    if (!businessId) {
+    if (!user) {
       return Response.json(
         { error: "Authentication required" },
         { status: 401 },
       );
     }
 
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
+      );
+    }
+
     const { data: lead, error } = await supabase
       .from("leads")
       .insert({
-        business_id: businessId,
+        business_id: business.id,
         name,
         contact,
         interest,
@@ -95,7 +90,10 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json({ lead }, { status: 201 });
+    return Response.json(
+      { lead },
+      { status: 201 },
+    );
   } catch {
     return Response.json(
       { error: "Invalid request body" },
@@ -118,13 +116,19 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const businessId = await getUserBusiness(supabase);
+    const { user, business, supabase } = await getAuthenticatedUser();
 
-    if (!businessId) {
+    if (!user) {
       return Response.json(
         { error: "Authentication required" },
         { status: 401 },
+      );
+    }
+
+    if (!business) {
+      return Response.json(
+        { error: "Business workspace not found" },
+        { status: 404 },
       );
     }
 
@@ -132,7 +136,7 @@ export async function PATCH(request: Request) {
       .from("leads")
       .update({ status })
       .eq("id", id)
-      .eq("business_id", businessId)
+      .eq("business_id", business.id)
       .select()
       .single();
 

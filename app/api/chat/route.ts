@@ -1,13 +1,41 @@
-import { agents, conversations, knowledge } from "@/app/lib/store";
+import { createClient } from "@/app/lib/supabase-server";
 
-function findRelevantKnowledge(message: string, agentId: string) {
+async function getUserBusiness(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) return null;
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("business_members")
+    .select("business_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError || !membership) return null;
+
+  return membership.business_id;
+}
+
+function findRelevantKnowledge(
+  message: string,
+  knowledge: Array<{
+    id: string;
+    title: string;
+    content: string;
+  }>,
+) {
   const words = message
     .toLowerCase()
     .split(/\W+/)
     .filter((word) => word.length > 2);
 
   return knowledge
-    .filter((item) => item.agentId === agentId)
     .map((item) => {
       const text = `${item.title} ${item.content}`.toLowerCase();
 
@@ -28,11 +56,60 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const agentId = searchParams.get("agentId");
 
-  const items = agentId
-    ? conversations.filter((item) => item.agentId === agentId)
-    : conversations;
+  if (!agentId) {
+    return Response.json(
+      { error: "Agent ID is required" },
+      { status: 400 },
+    );
+  }
 
-  return Response.json({ conversations: items });
+  const supabase = await createClient();
+  const businessId = await getUserBusiness(supabase);
+
+  if (!businessId) {
+    return Response.json(
+      { error: "Authentication required" },
+      { status: 401 },
+    );
+  }
+
+  const { data: agent, error: agentError } = await supabase
+    .from("agents")
+    .select("id")
+    .eq("id", agentId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (agentError) {
+    return Response.json({ error: agentError.message }, { status: 500 });
+  }
+
+  if (!agent) {
+    return Response.json(
+      { error: "Agent not found" },
+      { status: 404 },
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("agent_id", agentId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  const conversations = data.map((item) => ({
+    id: item.id,
+    agentId: item.agent_id,
+    message: item.message,
+    reply: item.reply,
+    createdAt: item.created_at,
+  }));
+
+  return Response.json({ conversations });
 }
 
 export async function POST(request: Request) {
@@ -56,7 +133,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const agent = agents.find((item) => item.id === agentId);
+    const supabase = await createClient();
+    const businessId = await getUserBusiness(supabase);
+
+    if (!businessId) {
+      return Response.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+
+    const { data: agent, error: agentError } = await supabase
+      .from("agents")
+      .select("id, name, status")
+      .eq("id", agentId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (agentError) {
+      return Response.json({ error: agentError.message }, { status: 500 });
+    }
 
     if (!agent) {
       return Response.json(
@@ -72,7 +168,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const relevantKnowledge = findRelevantKnowledge(message, agentId);
+    const { data: knowledge, error: knowledgeError } = await supabase
+      .from("knowledge_items")
+      .select("id, title, content")
+      .eq("agent_id", agentId);
+
+    if (knowledgeError) {
+      return Response.json(
+        { error: knowledgeError.message },
+        { status: 500 },
+      );
+    }
+
+    const relevantKnowledge = findRelevantKnowledge(message, knowledge || []);
 
     let reply: string;
 
@@ -89,15 +197,27 @@ export async function POST(request: Request) {
         "If you need more help, I can connect you with a member of the team.";
     }
 
-    const conversation = {
-      id: crypto.randomUUID(),
-      agentId,
-      message,
-      reply,
-      createdAt: new Date().toISOString(),
-    };
+    const { data, error } = await supabase
+      .from("conversations")
+      .insert({
+        agent_id: agentId,
+        message,
+        reply,
+      })
+      .select()
+      .single();
 
-    conversations.push(conversation);
+    if (error) {
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+
+    const conversation = {
+      id: data.id,
+      agentId: data.agent_id,
+      message: data.message,
+      reply: data.reply,
+      createdAt: data.created_at,
+    };
 
     return Response.json({ conversation }, { status: 201 });
   } catch {
